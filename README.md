@@ -47,8 +47,7 @@ git diff "%EMPTY_TREE%" HEAD -- > overlay.patch
 ```
 
 ```batch
-
-git apply 
+git -C C:\your-v8-checkout apply C:\src\v8-overlay\overlay.patch
 ```
 
 ## tools\dev\run-tests.bat
