@@ -1,0 +1,6 @@
+root = true
+
+[*]
+env_of_line = lf
+insert_final_newline = true
+
