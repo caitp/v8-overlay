@@ -1,0 +1,3 @@
+patches/get-test262-pr.bat
+tools/dev/gm.bat
+tools/dev/run-tests.bat

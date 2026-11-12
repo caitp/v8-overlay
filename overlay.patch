@@ -1,0 +1,123 @@
+diff --git a/patches/get-test262-pr.bat b/patches/get-test262-pr.bat
+new file mode 100644
+index 0000000..f047f84
+--- /dev/null
++++ b/patches/get-test262-pr.bat
+@@ -0,0 +1,53 @@
++@echo off
++setlocal
++
++if "%~2"=="" (
++  echo Usage: %~nx0 PR_NUMBER V8_CHECKOUT
++  echo Example: %~nx0 1234 C:\src\v8
++  exit /b 1
++)
++
++set "PR=%~1"
++set "DEST=%~2\test\test262\local-tests"
++set "API=https://api.github.com/repos/tc39/test262/pulls/%PR%/files?per_page=100"
++
++> "%TEMP%\test262-filter.jq" echo .[] ^| [.filename, .raw_url] ^| join^("|"^)
++
++type nul > "%TEMP%\test262-pr-files.txt"
++set "PAGE=1"
++
++:fetch_page
++set "API=https://api.github.com/repos/tc39/test262/pulls/%PR%/files?per_page=100&page=%PAGE%"
++
++curl -fsSL "%API%" -o "%TEMP%\test262-pr-files.json"
++if errorlevel 1 (
++  echo Failed to retrieve PR file list.
++  exit /b 1
++)
++
++for /f %%C in ('jq length "%TEMP%\test262-pr-files.json"') do set "COUNT=%%C"
++
++if "%COUNT%"=="0" goto files_ready
++
++jq -r -f "%TEMP%\test262-filter.jq" "%TEMP%\test262-pr-files.json" >> "%TEMP%\test262-pr-files.txt"
++if errorlevel 1 (
++  echo Failed to retrieve PR file list. Check that curl and jq are installed.
++  exit /b 1
++)
++
++if %COUNT% LSS 100 goto files_ready
++set /a PAGE+=1
++goto fetch_page
++
++:files_ready
++for /f "usebackq tokens=1,2 delims=|" %%A in ("%TEMP%\test262-pr-files.txt") do (
++  for %%D in ("%DEST%\%%A") do if not exist "%%~dpD" mkdir "%%~dpD"
++  curl -fsSL "%%B" -o "%DEST%\%%A"
++  if errorlevel 1 (
++    echo Failed to download %%A
++    exit /b 1
++  )
++  echo Downloaded %%A
++)
++
++del "%TEMP%\test262-pr-files.txt"
+diff --git a/tools/dev/gm.bat b/tools/dev/gm.bat
+new file mode 100644
+index 0000000..a0f9e56
+--- /dev/null
++++ b/tools/dev/gm.bat
+@@ -0,0 +1,6 @@
++@echo off
++setlocal
++
++set "python_script=%~dpn0.py"
++python3 "%python_script%" %*
++exit /b %errorlevel%
+diff --git a/tools/dev/run-tests.bat b/tools/dev/run-tests.bat
+new file mode 100644
+index 0000000..34d3cef
+--- /dev/null
++++ b/tools/dev/run-tests.bat
+@@ -0,0 +1,46 @@
++@echo off
++setlocal
++
++set "ARCH="
++set "OUTDIR="
++set "NEXT="
++for %%A in (%*) do (
++  set "ARG=%%~A"
++
++  if defined NEXT (
++    if "!NEXT!"=="arch" set "ARCH=--arch=%%~A"
++    if "!NEXT!"=="outdir" set "OUTDIR=%%~A"
++    set "NEXT="
++  ) else (
++    if /i "!ARG!"=="--arch" set "NEXT=arch"
++    if /i "!ARG!"=="--outdir" set "NEXT=outdir"
++    if /i "!ARG:~0,7!"=="--arch=" set "ARCH=!ARG:~7!"
++    if /i "!ARG:~0,9!"=="--outdir=" set "OUTDIR=!ARG:~9!"
++  )
++)
++
++if not defined ARCH if defined OUTDIR (
++  set "DIR=!OUTDIR:\= !"
++  set "DIR=!DIR:/= !"
++  set "DIR=!DIR:.= !"
++  set "DIR=!DIR:-= !"
++
++  for %%A in (!DIR!) do (
++    if not defined ARCH if /i "%%A"=="arm64" set "ARCH=--arch=arm64"
++    if not defined ARCH if /i "%%A"=="riscv64" set "ARCH=--arch=riscv64"
++    if not defined ARCH if /i "%%A"=="loong64" set "ARCH=--arch=loong64"
++    if not defined ARCH if /i "%%A"=="mips64el" set "ARCH=--arch=mips64el"
++    if not defined ARCH if /i "%%A"=="ppc64" set "ARCH=--arch=ppc64"
++    if not defined ARCH if /i "%%A"=="s390x" set "ARCH=--arch=s390x"
++    if not defined ARCH if /i "%%A"=="ia32" set "ARCH=--arch=ia32"
++    if not defined ARCH if /i "%%A"=="arm" set "ARCH=--arch=arm"
++    if not defined ARCH if /i "%%A"=="x64" set "ARCH=--arch=x64"
++  )
++)
++if not defined ARCH set "ARCH=--arch=x64"
++
++pushd "%~dp0..\.." || exit /b 1
++python3 "%~dp0..\run-tests.py" %ARCH% %*
++set "result=%ERRORLEVEL%"
++popd
++exit /b %result%
